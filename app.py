@@ -98,7 +98,7 @@ if submitted:
 st.divider()
 
 # 3. 실시간 매칭 추천 현황판 (원하는 카드별 보기 방식으로 변경)
-st.header("🤝 내 맞춤형 교환 매칭 확인")
+st.header("🤝 교환 매칭 확인")
 
 try:
     res = requests.get(GAS_URL)
