@@ -60,7 +60,7 @@ if "show_success_msg" not in st.session_state:
 # 등록 직후 센스있는 안내 문구 출력
 if st.session_state["show_success_msg"]:
     st.toast("⚔️ 교환 정보 등록 완료! 아래 매칭판을 확인하세요!", icon="🎉")
-    st.success(f"🎉 **[{st.session_state['registered_user']}]**님의 카드가 성공적으로 등록되었습니다!\n\n👇 **아래 '🤝 교환 매칭 확인'에서 나만의 교환 상대를 바로 확인해보세요!**")
+    st.success(f"🎉 [{st.session_state['registered_user']}]님의 카드가 성공적으로 등록되었습니다!\n\n👇 아래 '🤝 교환 매칭 확인'에서 교환 상대를 바로 확인해보세요!")
     st.balloons()
     st.session_state["show_success_msg"] = False  # 한 번 보여주고 초기화
 
@@ -68,7 +68,7 @@ if st.session_state["show_success_msg"]:
 st.subheader("📝 내 카드 교환 정보 등록")
 
 with st.form("coc_card_form", clear_on_submit=False):
-    nickname = st.text_input("카카오톡 닉네임", placeholder="예: PSG")
+    nickname = st.text_input("coc 닉네임", placeholder="예: PSG")
     
     have_cards = st.multiselect(
         "📦 내가 보유 중인 카드 (2장 가지고 있는 카드)",
