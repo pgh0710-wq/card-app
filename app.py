@@ -138,7 +138,7 @@ try:
         user_list = df["nickname"].tolist()
         
         # 👥 참여자 명단 표시 추가
-        st.markdown(f"👥 **현재 참여 중인 방원 ({len(user_list)}명):** " + " ".join([f"`{u}`" for u in user_list]))
+        st.markdown(f"👥 **참여 중인 클랜원 ({len(user_list)}명):** " + " ".join([f"`{u}`" for u in user_list]))
         st.write("")
 
         # 등록 직후 등록된 닉네임으로 인덱스 자동 지정
@@ -153,7 +153,7 @@ try:
         )
         
         if selected_user != "선택하세요":
-            st.subheader(f"✨ {selected_user}님을 위한 맞춤 교환 리스트")
+            st.subheader(f"{selected_user}님의 교환 리스트")
             
             my_info = df[df["nickname"] == selected_user].iloc[0]
             my_have = set([c.strip() for c in str(my_info["have_cards"]).split(",") if c.strip()])
@@ -185,12 +185,12 @@ try:
                 for item in perfect_matches:
                     st.success(f"🎯 **{item['want']}** ➔ **[{item['target']}]** 님과 교환 가능! (내가 줄 카드: `{item['give']}`)")
             else:
-                st.info(f"💡 현재 **[{selected_user}]**님이 원하시는 카드를 서로 맞교환할 수 있는 방원이 아직 없습니다. 새로운 카드가 등록될 때까지 조금만 기다려 보세요!")
+                st.info(f"💡 현재 **[{selected_user}]**님이 원하시는 카드를 서로 맞교환할 수 있는 클랜원이 아직 없습니다. 새로운 카드가 등록될 때까지 조금만 기다려 보세요!")
 
         st.divider()
         
         # 전체 교환 가능 조합 한눈에 보기
-        st.subheader("⚡ 현재 가능한 모든 1:1 교환 조합")
+        st.subheader("가능한 교환 조합")
         all_matches = []
         processed_pairs = set()
 
@@ -214,16 +214,16 @@ try:
                 if p1_gives and p2_gives:
                     processed_pairs.add(pair_key)
                     all_matches.append({
-                        "방원 1": p1,
+                        "클랜원": p1,
                         "줄 카드": ", ".join(p1_gives),
-                        "방원 2": p2,
+                        "클랜원": p2,
                         "받을 카드": ", ".join(p2_gives)
                     })
 
         if all_matches:
             st.dataframe(pd.DataFrame(all_matches), use_container_width=True, hide_index=True)
         else:
-            st.write("아직 조건이 딱 맞는 방원 간의 교환 조합이 없습니다.")
+            st.write("아직 조건이 딱 맞는 클랜원 간의 교환 조합이 없습니다.")
 
         st.divider()
         st.subheader("📋 전체 등록 현황")
