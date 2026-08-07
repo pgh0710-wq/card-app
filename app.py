@@ -46,8 +46,8 @@ for category, cards in CARD_DB.items():
     for card in cards:
         ALL_CARDS.append(f"[{category.split()[1]}] {card}")
 
-st.title("⚔️카드 교환 시스템⚔️")
-st.write("보유중(2장 이상)인 카드와 원하는(갖고 싶은)카드를 입력하세요.")
+st.title("ARES 카드 교환")
+st.write("2장 이상인 카드와 갖고 싶은 카드를 입력하세요.")
 
 st.divider()
 
