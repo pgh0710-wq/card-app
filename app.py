@@ -51,9 +51,18 @@ st.write("2장 이상인 카드와 갖고 싶은 카드를 입력하세요.")
 
 st.divider()
 
-# 세션 상태 초기화 (등록된 닉네임 자동 저장용)
+# 세션 상태 초기화
 if "registered_user" not in st.session_state:
     st.session_state["registered_user"] = ""
+if "show_success_msg" not in st.session_state:
+    st.session_state["show_success_msg"] = False
+
+# 등록 직후 센스있는 안내 문구 출력
+if st.session_state["show_success_msg"]:
+    st.toast("⚔️ 교환 정보 등록 완료! 아래 매칭판을 확인하세요!", icon="🎉")
+    st.success(f"🎉 **[{st.session_state['registered_user']}]**님의 카드가 성공적으로 등록되었습니다!\n\n👇 **아래 '🤝 교환 매칭 확인'에서 나만의 교환 상대를 바로 확인해보세요!**")
+    st.balloons()
+    st.session_state["show_success_msg"] = False  # 한 번 보여주고 초기화
 
 # 1. 정보 입력 폼
 st.subheader("📝 내 카드 교환 정보 등록")
@@ -75,7 +84,7 @@ with st.form("coc_card_form", clear_on_submit=False):
     
     submitted = st.form_submit_button("등록 및 자동 매칭 조회 🚀")
 
-# 2. 저장 및 즉시 자동 새로고침 처리
+# 2. 저장 요청 처리
 if submitted:
     if not nickname.strip():
         st.error("닉네임을 반드시 입력해 주세요!")
@@ -93,9 +102,8 @@ if submitted:
         try:
             res = requests.post(GAS_URL, json=payload)
             if res.status_code == 200:
-                # 등록 성공 시 닉네임을 기록하고 즉시 화면을 다시 불러와 자동 선택시킴
                 st.session_state["registered_user"] = nickname.strip()
-                st.success(f"🎉 **[{nickname}]**님의 정보 등록 완료! 매칭 결과를 불러옵니다.")
+                st.session_state["show_success_msg"] = True  # 성공 메시지 플래그 켜기
                 st.rerun()
             else:
                 st.error("저장에 실패했습니다. 관리자에게 문의하세요.")
@@ -112,7 +120,7 @@ try:
     raw_data = res.json()
     
     if len(raw_data) > 1:
-        # 최신 데이터 df 화 (중복 닉네임 시 최신 데이터만 유지)
+        # 최신 데이터 df 화
         df = pd.DataFrame(raw_data[1:], columns=["nickname", "have_cards", "want_cards", "date"])
         df = df.drop_duplicates(subset=["nickname"], keep="last")
         user_list = df["nickname"].tolist()
@@ -148,7 +156,6 @@ try:
                     other_have = set([c.strip() for c in row["have_cards"].split(",") if c.strip()])
                     other_want = set([c.strip() for c in row["want_cards"].split(",") if c.strip()])
                     
-                    # 상대방이 내 희망 카드를 가지고 있고 + 내가 상대 희망 카드를 줄 수 있을 때
                     if want_card in other_have:
                         give_to_them = my_have.intersection(other_want)
                         if give_to_them:
@@ -163,10 +170,8 @@ try:
                     for p in providers:
                         st.success(f"🤝 **{p['nickname']}** 님과 교환 가능! ➔ (대신 줄 카드: `{p['give']}`)")
             
-            if match_found_overall:
-                st.balloons()
-            else:
-                st.info(f"💡 현재 {selected_user}님이 원하시는 카드를 서로 맞교환할 수 있는 방원이 아직 없습니다.")
+            if not match_found_overall:
+                st.info(f"💡 현재 **{selected_user}**님이 원하시는 카드를 서로 맞교환할 수 있는 방원이 아직 없습니다. 새로운 카드가 등록될 때까지 조금만 기다려 보세요!")
 
         st.divider()
         
