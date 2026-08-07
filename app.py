@@ -5,7 +5,7 @@ import pandas as pd
 # 페이지 설정
 st.set_page_config(page_title="coc 카드교환", page_icon="⚔️", layout="centered")
 
-# ⚠️ Streamlit 기본 메뉴 및 워터마크 깔끔하게 숨기기
+# Streamlit 기본 메뉴 및 워터마크 숨기기
 hide_streamlit_style = """
 <style>
 #MainMenu {visibility: hidden;}
@@ -15,7 +15,7 @@ header {visibility: hidden;}
 """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
-# ⚠️ 구글 Apps Script 웹앱 URL을 확인하세요!
+# 구글 Apps Script 웹앱 URL
 GAS_URL = "https://script.google.com/macros/s/AKfycby3wOkkVcxR8aalT0WI8BSONibv0zfkrFN176mthE3PAzZPkyBTA0thuQQ40fW8YyrX/exec"
 
 # 카드 데이터베이스 구축
@@ -51,14 +51,18 @@ st.write("2장 이상인 카드와 갖고 싶은 카드를 입력하세요.")
 
 st.divider()
 
-# 1. 정보 입력 폼 (연락처 제거됨)
-st.subheader("📝내 카드 교환 정보 등록")
+# 세션 상태 초기화 (등록된 닉네임 자동 저장용)
+if "registered_user" not in st.session_state:
+    st.session_state["registered_user"] = ""
+
+# 1. 정보 입력 폼
+st.subheader("📝 내 카드 교환 정보 등록")
 
 with st.form("coc_card_form", clear_on_submit=False):
     nickname = st.text_input("카카오톡 닉네임", placeholder="예: PSG")
     
     have_cards = st.multiselect(
-        "📦내가 보유 중인 카드 (2장 가지고 있는 카드)",
+        "📦 내가 보유 중인 카드 (2장 가지고 있는 카드)",
         options=ALL_CARDS,
         placeholder="여러 개 선택 가능합니다"
     )
@@ -69,9 +73,9 @@ with st.form("coc_card_form", clear_on_submit=False):
         placeholder="여러 개 선택 가능합니다"
     )
     
-    submitted = st.form_submit_button("등록 및 저장")
+    submitted = st.form_submit_button("등록 및 자동 매칭 조회 🚀")
 
-# 2. 저장 요청
+# 2. 저장 및 즉시 자동 새로고침 처리
 if submitted:
     if not nickname.strip():
         st.error("닉네임을 반드시 입력해 주세요!")
@@ -81,7 +85,7 @@ if submitted:
         st.error("구하는 카드를 최소 1개 이상 선택해 주세요!")
     else:
         payload = {
-            "nickname": nickname,
+            "nickname": nickname.strip(),
             "have_cards": ", ".join(have_cards),
             "want_cards": ", ".join(want_cards)
         }
@@ -89,7 +93,10 @@ if submitted:
         try:
             res = requests.post(GAS_URL, json=payload)
             if res.status_code == 200:
-                st.success(f"🎉 **[{nickname}]**님의 교환 정보가 성공적으로 등록되었습니다!")
+                # 등록 성공 시 닉네임을 기록하고 즉시 화면을 다시 불러와 자동 선택시킴
+                st.session_state["registered_user"] = nickname.strip()
+                st.success(f"🎉 **[{nickname}]**님의 정보 등록 완료! 매칭 결과를 불러옵니다.")
+                st.rerun()
             else:
                 st.error("저장에 실패했습니다. 관리자에게 문의하세요.")
         except Exception as e:
@@ -97,7 +104,7 @@ if submitted:
 
 st.divider()
 
-# 3. 실시간 매칭 추천 현황판 (원하는 카드별 보기 방식으로 변경)
+# 3. 실시간 매칭 현황판
 st.header("🤝 교환 매칭 확인")
 
 try:
@@ -105,17 +112,24 @@ try:
     raw_data = res.json()
     
     if len(raw_data) > 1:
-        # 최신 데이터 df 화 (헤더 제외)
+        # 최신 데이터 df 화 (중복 닉네임 시 최신 데이터만 유지)
         df = pd.DataFrame(raw_data[1:], columns=["nickname", "have_cards", "want_cards", "date"])
-        
-        # 중복 닉네임 시 최신 데이터만 유지
         df = df.drop_duplicates(subset=["nickname"], keep="last")
         user_list = df["nickname"].tolist()
         
-        selected_user = st.selectbox("🔍 내 닉네임을 선택하세요:", ["선택하세요"] + user_list)
+        # 등록 직후 등록된 닉네임으로 인덱스 자동 지정
+        default_idx = 0
+        if st.session_state["registered_user"] in user_list:
+            default_idx = user_list.index(st.session_state["registered_user"]) + 1
+
+        selected_user = st.selectbox(
+            "🔍 내 닉네임을 선택하세요:", 
+            ["선택하세요"] + user_list,
+            index=default_idx
+        )
         
         if selected_user != "선택하세요":
-            st.subheader(f"✨ {selected_user}님을 위한 교환 추천 리스트")
+            st.subheader(f"✨ {selected_user}님을 위한 맞춤 교환 리스트")
             
             my_info = df[df["nickname"] == selected_user].iloc[0]
             my_have = set([c.strip() for c in my_info["have_cards"].split(",") if c.strip()])
@@ -123,7 +137,7 @@ try:
             
             match_found_overall = False
             
-            # 원하는 카드별로 분류해서 보여주기
+            # 원하는 카드별로 맞교환 가능 상대 탐색
             for want_card in my_want:
                 providers = []
                 
@@ -134,29 +148,63 @@ try:
                     other_have = set([c.strip() for c in row["have_cards"].split(",") if c.strip()])
                     other_want = set([c.strip() for c in row["want_cards"].split(",") if c.strip()])
                     
-                    # 1. 상대방이 내가 원하는 카드를 가지고 있는가?
+                    # 상대방이 내 희망 카드를 가지고 있고 + 내가 상대 희망 카드를 줄 수 있을 때
                     if want_card in other_have:
-                        # 2. 내가 상대방이 원하는 카드를 줄 수 있는가? (서로 교환 성립)
                         give_to_them = my_have.intersection(other_want)
-                        
                         if give_to_them:
                             providers.append({
                                 "nickname": row["nickname"],
                                 "give": ", ".join(give_to_them)
                             })
                 
-                # 이 카드를 교환할 수 있는 상대가 있다면 출력
                 if providers:
                     match_found_overall = True
-                    with st.container():
-                        st.markdown(f"#### 🎯 **{want_card}** 얻기")
-                        for p in providers:
-                            st.success(f"🤝 **{p['nickname']}** 님과 교환 가능! ➔ (대신 줄 카드: `{p['give']}`)")
+                    st.markdown(f"#### 🎯 **{want_card}** 얻기")
+                    for p in providers:
+                        st.success(f"🤝 **{p['nickname']}** 님과 교환 가능! ➔ (대신 줄 카드: `{p['give']}`)")
             
             if match_found_overall:
                 st.balloons()
             else:
-                st.info(f"💡 현재 {selected_user}님이 원하시는 카드를 서로 맞교환할 수 있는 방원이 아직 없습니다. 조금 더 기다려 보세요!")
+                st.info(f"💡 현재 {selected_user}님이 원하시는 카드를 서로 맞교환할 수 있는 방원이 아직 없습니다.")
+
+        st.divider()
+        
+        # 전체 교환 가능 조합 한눈에 보기
+        st.subheader("⚡ 현재 가능한 모든 1:1 교환 조합")
+        all_matches = []
+        processed_pairs = set()
+
+        for i, row1 in df.iterrows():
+            for j, row2 in df.iterrows():
+                if i >= j:
+                    continue
+                p1, p2 = row1["nickname"], row2["nickname"]
+                pair_key = tuple(sorted([p1, p2]))
+                if pair_key in processed_pairs:
+                    continue
+
+                p1_have = set([c.strip() for c in row1["have_cards"].split(",") if c.strip()])
+                p1_want = set([c.strip() for c in row1["want_cards"].split(",") if c.strip()])
+                p2_have = set([c.strip() for c in row2["have_cards"].split(",") if c.strip()])
+                p2_want = set([c.strip() for c in row2["want_cards"].split(",") if c.strip()])
+
+                p1_gives = p1_have.intersection(p2_want)
+                p2_gives = p2_have.intersection(p1_want)
+
+                if p1_gives and p2_gives:
+                    processed_pairs.add(pair_key)
+                    all_matches.append({
+                        "방원 1": p1,
+                        "줄 카드": ", ".join(p1_gives),
+                        "방원 2": p2,
+                        "받을 카드": ", ".join(p2_gives)
+                    })
+
+        if all_matches:
+            st.dataframe(pd.DataFrame(all_matches), use_container_width=True, hide_index=True)
+        else:
+            st.write("아직 조건이 딱 맞는 방원 간의 교환 조합이 없습니다.")
 
         st.divider()
         st.subheader("📋 전체 등록 현황")
