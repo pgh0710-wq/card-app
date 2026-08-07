@@ -2,9 +2,20 @@ import streamlit as st
 import requests
 import pandas as pd
 
-st.set_page_config(page_title="클래시 오브 클랜 카드 교환 매칭", page_icon="⚔️", layout="centered")
+# 페이지 설정
+st.set_page_config(page_title="coc 카드교환", page_icon="⚔️", layout="centered")
 
-# ⚠️ 여기에 구글 Apps Script 웹앱 URL을 넣으세요!
+# ⚠️ Streamlit 기본 메뉴 및 워터마크 깔끔하게 숨기기
+hide_streamlit_style = """
+<style>
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+header {visibility: hidden;}
+</style>
+"""
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
+# ⚠️ 구글 Apps Script 웹앱 URL을 확인하세요!
 GAS_URL = "https://script.google.com/macros/s/AKfycby3wOkkVcxR8aalT0WI8BSONibv0zfkrFN176mthE3PAzZPkyBTA0thuQQ40fW8YyrX/exec"
 
 # 카드 데이터베이스 구축
@@ -35,19 +46,19 @@ for category, cards in CARD_DB.items():
     for card in cards:
         ALL_CARDS.append(f"[{category.split()[1]}] {card}")
 
-st.title("⚔️ 클래시 오브 클랜 카드 교환 시스템")
-st.write("보유 중인 카드와 원하는 카드를 등록하면, 서로 교환 가능한 방원을 자동으로 찾아드립니다!")
+st.title("⚔️카드 교환 시스템⚔️")
+st.write("보유중(2장 이상)인 카드와 원하는(갖고 싶은)카드를 입력하세요.")
 
 st.divider()
 
-# 1. 정보 입력 폼
-st.subheader("📝 내 카드 교환 정보 등록")
+# 1. 정보 입력 폼 (연락처 제거됨)
+st.subheader("📝내 카드 교환 정보 등록")
 
 with st.form("coc_card_form", clear_on_submit=False):
-    nickname = st.text_input("카카오톡 닉네임", placeholder="예: 최고클래시")
+    nickname = st.text_input("카카오톡 닉네임", placeholder="예: PSG")
     
     have_cards = st.multiselect(
-        "📦 내가 보유 중인 카드 (교환해 줄 수 있는 카드)",
+        "📦내가 보유 중인 카드 (2장 가지고 있는 카드)",
         options=ALL_CARDS,
         placeholder="여러 개 선택 가능합니다"
     )
@@ -58,9 +69,7 @@ with st.form("coc_card_form", clear_on_submit=False):
         placeholder="여러 개 선택 가능합니다"
     )
     
-    open_chat = st.text_input("오픈채팅/연락처 링크 (선택)", placeholder="https://open.kakao.com/o/...")
-    
-    submitted = st.form_submit_button("등록 및 자동 매칭 조회")
+    submitted = st.form_submit_button("등록 및 저장")
 
 # 2. 저장 요청
 if submitted:
@@ -74,8 +83,7 @@ if submitted:
         payload = {
             "nickname": nickname,
             "have_cards": ", ".join(have_cards),
-            "want_cards": ", ".join(want_cards),
-            "open_chat": open_chat
+            "want_cards": ", ".join(want_cards)
         }
         
         try:
@@ -89,63 +97,71 @@ if submitted:
 
 st.divider()
 
-# 3. 실시간 매칭 추천 현황판
-st.header("🤝 추천 교환 매칭 현황판")
+# 3. 실시간 매칭 추천 현황판 (원하는 카드별 보기 방식으로 변경)
+st.header("🤝 내 맞춤형 교환 매칭 확인")
 
 try:
     res = requests.get(GAS_URL)
     raw_data = res.json()
     
     if len(raw_data) > 1:
-        # 최신 데이터 df 화
-        df = pd.DataFrame(raw_data[1:], columns=["nickname", "have_cards", "want_cards", "open_chat", "date"])
+        # 최신 데이터 df 화 (헤더 제외)
+        df = pd.DataFrame(raw_data[1:], columns=["nickname", "have_cards", "want_cards", "date"])
         
         # 중복 닉네임 시 최신 데이터만 유지
         df = df.drop_duplicates(subset=["nickname"], keep="last")
-        
         user_list = df["nickname"].tolist()
         
-        selected_user = st.selectbox("🔍 매칭 상대를 확인할 닉네임을 선택하세요:", ["선택하세요"] + user_list)
+        selected_user = st.selectbox("🔍 내 닉네임을 선택하세요:", ["선택하세요"] + user_list)
         
         if selected_user != "선택하세요":
+            st.subheader(f"✨ {selected_user}님을 위한 교환 추천 리스트")
+            
             my_info = df[df["nickname"] == selected_user].iloc[0]
             my_have = set([c.strip() for c in my_info["have_cards"].split(",") if c.strip()])
             my_want = set([c.strip() for c in my_info["want_cards"].split(",") if c.strip()])
             
-            matches = []
+            match_found_overall = False
             
-            for idx, row in df.iterrows():
-                if row["nickname"] == selected_user:
-                    continue
+            # 원하는 카드별로 분류해서 보여주기
+            for want_card in my_want:
+                providers = []
                 
-                other_have = set([c.strip() for c in row["have_cards"].split(",") if c.strip()])
-                other_want = set([c.strip() for c in row["want_cards"].split(",") if c.strip()])
+                for idx, row in df.iterrows():
+                    if row["nickname"] == selected_user:
+                        continue
+                    
+                    other_have = set([c.strip() for c in row["have_cards"].split(",") if c.strip()])
+                    other_want = set([c.strip() for c in row["want_cards"].split(",") if c.strip()])
+                    
+                    # 1. 상대방이 내가 원하는 카드를 가지고 있는가?
+                    if want_card in other_have:
+                        # 2. 내가 상대방이 원하는 카드를 줄 수 있는가? (서로 교환 성립)
+                        give_to_them = my_have.intersection(other_want)
+                        
+                        if give_to_them:
+                            providers.append({
+                                "nickname": row["nickname"],
+                                "give": ", ".join(give_to_them)
+                            })
                 
-                # 내가 줄 수 있고 상대가 원하는 것
-                give = my_have.intersection(other_want)
-                # 상대가 줄 수 있고 내가 원하는 것
-                take = other_have.intersection(my_want)
-                
-                if give and take:
-                    matches.append({
-                        "상대 닉네임": row["nickname"],
-                        "내가 줄 카드": ", ".join(give),
-                        "내가 받을 카드": ", ".join(take),
-                        "상대 오픈채팅": row["open_chat"] if row["open_chat"] else "미입력"
-                    })
+                # 이 카드를 교환할 수 있는 상대가 있다면 출력
+                if providers:
+                    match_found_overall = True
+                    with st.container():
+                        st.markdown(f"#### 🎯 **{want_card}** 얻기")
+                        for p in providers:
+                            st.success(f"🤝 **{p['nickname']}** 님과 교환 가능! ➔ (대신 줄 카드: `{p['give']}`)")
             
-            if matches:
+            if match_found_overall:
                 st.balloons()
-                st.success(f"✨ **{selected_user}**님과 **서로 완벽 교환 가능한 방원 {len(matches)}명**을 찾았습니다!")
-                match_df = pd.DataFrame(matches)
-                st.dataframe(match_df, use_container_width=True, hide_index=True)
             else:
-                st.info(f"💡 현재 **{selected_user}**님과 서로 조건이 100% 딱 맞는 교환 상대가 없습니다. 새로운 카드가 등록될 때까지 기다려 보세요!")
+                st.info(f"💡 현재 {selected_user}님이 원하시는 카드를 서로 맞교환할 수 있는 방원이 아직 없습니다. 조금 더 기다려 보세요!")
 
         st.divider()
-        st.subheader("📋 전체 방원 등록 현황")
-        display_all = df[["nickname", "have_cards", "want_cards", "open_chat"]].copy()
-        display_all.columns = ["닉네임", "보유 카드", "희망 카드", "연락처/오픈채팅"]
+        st.subheader("📋 전체 등록 현황")
+        display_all = df[["nickname", "have_cards", "want_cards"]].copy()
+        display_all.columns = ["닉네임", "보유 카드", "희망 카드"]
         st.dataframe(display_all, use_container_width=True, hide_index=True)
 
     else:
