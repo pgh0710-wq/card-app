@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 import pandas as pd
+import time
 
 # 페이지 설정
 st.set_page_config(page_title="coc 카드교환", page_icon="⚔️", layout="centered")
@@ -59,8 +60,8 @@ if "show_success_msg" not in st.session_state:
 
 # 등록 직후 센스있는 안내 문구 출력
 if st.session_state["show_success_msg"]:
-    st.toast("!교환 정보 등록 완료! ", icon="🎉")
-    st.success(f"🎉 [{st.session_state['registered_user']}]님의 카드가 성공적으로 등록되었습니다!\n\n👇 아래 '🤝 교환 매칭 확인'에서 교환 상대를 바로 확인해보세요!")
+    st.toast("교환 정보 등록 완료!", icon="🎉")
+    st.success(f"🎉 **[{st.session_state['registered_user']}]**님의 카드가 성공적으로 등록되었습니다!\n\n👇 아래 '🤝 교환 매칭 확인'에서 교환 상대를 바로 확인해보세요!")
     st.balloons()
     st.session_state["show_success_msg"] = False  # 한 번 보여주고 초기화
 
@@ -103,7 +104,8 @@ if submitted:
             res = requests.post(GAS_URL, json=payload)
             if res.status_code == 200:
                 st.session_state["registered_user"] = nickname.strip()
-                st.session_state["show_success_msg"] = True  # 성공 메시지 플래그 켜기
+                st.session_state["show_success_msg"] = True
+                time.sleep(1.5)  # 구글 시트에 최신 데이터가 작성될 시간을 대기
                 st.rerun()
             else:
                 st.error("저장에 실패했습니다. 관리자에게 문의하세요.")
@@ -115,16 +117,30 @@ st.divider()
 # 3. 실시간 매칭 현황판
 st.header("🤝 교환 매칭 확인")
 
+# 수동 새로고침 버튼
+if st.button("🔄 실시간 매칭 새로고침"):
+    st.rerun()
+
 try:
     res = requests.get(GAS_URL)
     raw_data = res.json()
     
     if len(raw_data) > 1:
-        # 최신 데이터 df 화
-        df = pd.DataFrame(raw_data[1:], columns=["nickname", "have_cards", "want_cards", "date"])
+        # 데이터프레임 변환
+        data_rows = raw_data[1:]
+        clean_rows = []
+        for r in data_rows:
+            if len(r) >= 3:
+                clean_rows.append([r[0], r[1], r[2], r[3] if len(r) > 3 else ""])
+                
+        df = pd.DataFrame(clean_rows, columns=["nickname", "have_cards", "want_cards", "date"])
         df = df.drop_duplicates(subset=["nickname"], keep="last")
         user_list = df["nickname"].tolist()
         
+        # 👥 참여자 명단 표시 추가
+        st.markdown(f"👥 **현재 참여 중인 방원 ({len(user_list)}명):** " + " ".join([f"`{u}`" for u in user_list]))
+        st.write("")
+
         # 등록 직후 등록된 닉네임으로 인덱스 자동 지정
         default_idx = 0
         if st.session_state["registered_user"] in user_list:
@@ -140,38 +156,36 @@ try:
             st.subheader(f"✨ {selected_user}님을 위한 맞춤 교환 리스트")
             
             my_info = df[df["nickname"] == selected_user].iloc[0]
-            my_have = set([c.strip() for c in my_info["have_cards"].split(",") if c.strip()])
-            my_want = set([c.strip() for c in my_info["want_cards"].split(",") if c.strip()])
+            my_have = set([c.strip() for c in str(my_info["have_cards"]).split(",") if c.strip()])
+            my_want = set([c.strip() for c in str(my_info["want_cards"]).split(",") if c.strip()])
             
-            match_found_overall = False
-            
-            # 원하는 카드별로 맞교환 가능 상대 탐색
+            perfect_matches = []  # 100% 맞교환 성립 조합만 모음
+
             for want_card in my_want:
-                providers = []
-                
                 for idx, row in df.iterrows():
                     if row["nickname"] == selected_user:
                         continue
                     
-                    other_have = set([c.strip() for c in row["have_cards"].split(",") if c.strip()])
-                    other_want = set([c.strip() for c in row["want_cards"].split(",") if c.strip()])
+                    other_name = row["nickname"]
+                    other_have = set([c.strip() for c in str(row["have_cards"]).split(",") if c.strip()])
+                    other_want = set([c.strip() for c in str(row["want_cards"]).split(",") if c.strip()])
                     
+                    # 100% 완벽 맞교환 조건
                     if want_card in other_have:
                         give_to_them = my_have.intersection(other_want)
                         if give_to_them:
-                            providers.append({
-                                "nickname": row["nickname"],
+                            perfect_matches.append({
+                                "want": want_card,
+                                "target": other_name,
                                 "give": ", ".join(give_to_them)
                             })
-                
-                if providers:
-                    match_found_overall = True
-                    st.markdown(f"#### 🎯 **{want_card}** 얻기")
-                    for p in providers:
-                        st.success(f"🤝 **{p['nickname']}** 님과 교환 가능! ➔ (대신 줄 카드: `{p['give']}`)")
-            
-            if not match_found_overall:
-                st.info(f"💡 현재 **{selected_user}**님이 원하시는 카드를 서로 맞교환할 수 있는 방원이 아직 없습니다. 새로운 카드가 등록될 때까지 조금만 기다려 보세요!")
+
+            # 100% 맞교환 가능 결과만 출력
+            if perfect_matches:
+                for item in perfect_matches:
+                    st.success(f"🎯 **{item['want']}** ➔ **[{item['target']}]** 님과 교환 가능! (내가 줄 카드: `{item['give']}`)")
+            else:
+                st.info(f"💡 현재 **[{selected_user}]**님이 원하시는 카드를 서로 맞교환할 수 있는 방원이 아직 없습니다. 새로운 카드가 등록될 때까지 조금만 기다려 보세요!")
 
         st.divider()
         
@@ -189,10 +203,10 @@ try:
                 if pair_key in processed_pairs:
                     continue
 
-                p1_have = set([c.strip() for c in row1["have_cards"].split(",") if c.strip()])
-                p1_want = set([c.strip() for c in row1["want_cards"].split(",") if c.strip()])
-                p2_have = set([c.strip() for c in row2["have_cards"].split(",") if c.strip()])
-                p2_want = set([c.strip() for c in row2["want_cards"].split(",") if c.strip()])
+                p1_have = set([c.strip() for c in str(row1["have_cards"]).split(",") if c.strip()])
+                p1_want = set([c.strip() for c in str(row1["want_cards"]).split(",") if c.strip()])
+                p2_have = set([c.strip() for c in str(row2["have_cards"]).split(",") if c.strip()])
+                p2_want = set([c.strip() for c in str(row2["want_cards"]).split(",") if c.strip()])
 
                 p1_gives = p1_have.intersection(p2_want)
                 p2_gives = p2_have.intersection(p1_want)
