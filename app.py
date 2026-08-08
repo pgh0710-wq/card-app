@@ -68,8 +68,8 @@ st.subheader("📝 내 카드 교환 정보 등록")
 
 nickname = st.text_input("coc 닉네임", placeholder="예: PSG")
 
-# 카드 그리드 버튼 생성 함수 (4열 바둑판 배치)
-def render_card_buttons(target_set_key, cols_per_row=4):
+# 카드 그리드 버튼 생성 함수 (★ 6열 바둑판 배치로 변경)
+def render_card_buttons(target_set_key, cols_per_row=6):
     for category_name, cards in CARD_DB.items():
         st.markdown(f"##### {category_name}")
         cols = st.columns(cols_per_row)
