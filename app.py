@@ -77,7 +77,6 @@ def render_card_buttons(target_set_key, cols_per_row=4):
             full_card_name = f"[{category_name.split()[1]}] {card}"
             is_selected = full_card_name in st.session_state[target_set_key]
             
-            # 버튼 라벨 및 스타일 설정
             label = f"✅ {card}" if is_selected else card
             btn_type = "primary" if is_selected else "secondary"
             
