@@ -37,67 +37,100 @@ CARD_DB = {
     "⚡ 슈퍼유닛": [
         "슈퍼 바바리안", "슈퍼 아처", "슈퍼 자이언트", "슈퍼 고블린", "슈퍼 해골 돌격병", 
         "로켓 비행선", "슈퍼 마법사", "슈퍼 드래곤", "인페르노 드래곤", "능력자 광부", 
-        "슈퍼 예티", "슈퍼 미니언", "슈퍼 호그라이더", "슈퍼 발키리","슈퍼 마녀", "아이스하운드", "슈퍼 볼러"
+        "슈퍼 예티", "슈퍼 미니언", "슈퍼 호그라이더", "슈퍼 발키리", "슈퍼 마녀", "아이스하운드", "슈퍼 볼러"
     ]
 }
-
-# 전체 카드 단일 리스트 생성
-ALL_CARDS = []
-for category, cards in CARD_DB.items():
-    for card in cards:
-        ALL_CARDS.append(f"[{category.split()[1]}] {card}")
-
-st.title("ARES 카드 교환")
-st.write("2장 이상인 카드와 갖고 싶은 카드를 입력하세요.")
-
-st.divider()
 
 # 세션 상태 초기화
 if "registered_user" not in st.session_state:
     st.session_state["registered_user"] = ""
 if "show_success_msg" not in st.session_state:
     st.session_state["show_success_msg"] = False
+if "have_selected" not in st.session_state:
+    st.session_state["have_selected"] = set()
+if "want_selected" not in st.session_state:
+    st.session_state["want_selected"] = set()
 
-# 등록 직후 센스있는 안내 문구 출력
+st.title("ARES 카드 교환")
+st.write("2장 이상인 카드와 갖고 싶은 카드를 버튼으로 터치하여 선택하세요!")
+
+st.divider()
+
+# 등록 직후 안내 문구
 if st.session_state["show_success_msg"]:
     st.toast("교환 정보 등록 완료!", icon="🎉")
     st.success(f"🎉 **[{st.session_state['registered_user']}]**님의 카드가 성공적으로 등록되었습니다!\n\n👇 아래 '🤝 교환 매칭 확인'에서 교환 상대를 바로 확인해보세요!")
     st.balloons()
-    st.session_state["show_success_msg"] = False  # 한 번 보여주고 초기화
+    st.session_state["show_success_msg"] = False
 
 # 1. 정보 입력 폼
 st.subheader("📝 내 카드 교환 정보 등록")
 
-with st.form("coc_card_form", clear_on_submit=False):
-    nickname = st.text_input("coc 닉네임", placeholder="예: PSG")
-    
-    have_cards = st.multiselect(
-        "📦 내가 보유 중인 카드 (2장 가지고 있는 카드)",
-        options=ALL_CARDS,
-        placeholder="여러 개 선택 가능합니다"
-    )
-    
-    want_cards = st.multiselect(
-        "🎯 내가 구하는 카드 (갖고 싶은 카드)",
-        options=ALL_CARDS,
-        placeholder="여러 개 선택 가능합니다"
-    )
-    
-    submitted = st.form_submit_button("등록 및 자동 매칭 조회 🚀")
+nickname = st.text_input("coc 닉네임", placeholder="예: PSG")
 
-# 2. 저장 요청 처리
-if submitted:
+# 카드 그리드 버튼 생성 함수 (4열 바둑판 배치)
+def render_card_buttons(target_set_key, cols_per_row=4):
+    for category_name, cards in CARD_DB.items():
+        st.markdown(f"##### {category_name}")
+        cols = st.columns(cols_per_row)
+        for idx, card in enumerate(cards):
+            full_card_name = f"[{category_name.split()[1]}] {card}"
+            is_selected = full_card_name in st.session_state[target_set_key]
+            
+            # 버튼 라벨 및 스타일 설정
+            label = f"✅ {card}" if is_selected else card
+            btn_type = "primary" if is_selected else "secondary"
+            
+            with cols[idx % cols_per_row]:
+                if st.button(label, key=f"{target_set_key}_{category_name}_{card}", type=btn_type, use_container_width=True):
+                    if is_selected:
+                        st.session_state[target_set_key].remove(full_card_name)
+                    else:
+                        st.session_state[target_set_key].add(full_card_name)
+                    st.rerun()
+
+# 보유/구하는 카드 선택 탭
+tab1, tab2 = st.tabs(["📦 내가 보유 중인 카드 (2장 이상)", "🎯 내가 구하는 카드"])
+
+with tab1:
+    st.caption("내가 2장 이상 가지고 있어 **남에게 줄 수 있는 카드**를 터치하세요.")
+    if st.button("🗑️ 보유 카드 전체 선택 해제", key="reset_have"):
+        st.session_state["have_selected"].clear()
+        st.rerun()
+    render_card_buttons("have_selected")
+
+with tab2:
+    st.caption("내가 **받고 싶은 카드**를 터치하세요.")
+    if st.button("🗑️ 희망 카드 전체 선택 해제", key="reset_want"):
+        st.session_state["want_selected"].clear()
+        st.rerun()
+    render_card_buttons("want_selected")
+
+st.markdown("---")
+
+# 현재 선택된 카드 요약 출력
+st.markdown("##### 📌 현재 선택 현황 요약")
+selected_have_list = list(st.session_state["have_selected"])
+selected_want_list = list(st.session_state["want_selected"])
+
+st.write("**📦 내가 줄 카드:** " + (", ".join([f"`{c}`" for c in selected_have_list]) if selected_have_list else "_선택 없음_"))
+st.write("**🎯 내가 받을 카드:** " + (", ".join([f"`{c}`" for c in selected_want_list]) if selected_want_list else "_선택 없음_"))
+
+st.write("")
+
+# 제출 버튼
+if st.button("🚀 등록 및 자동 매칭 조회", type="primary", use_container_width=True):
     if not nickname.strip():
         st.error("닉네임을 반드시 입력해 주세요!")
-    elif not have_cards:
+    elif not selected_have_list:
         st.error("보유 중인 카드를 최소 1개 이상 선택해 주세요!")
-    elif not want_cards:
+    elif not selected_want_list:
         st.error("구하는 카드를 최소 1개 이상 선택해 주세요!")
     else:
         payload = {
             "nickname": nickname.strip(),
-            "have_cards": ", ".join(have_cards),
-            "want_cards": ", ".join(want_cards)
+            "have_cards": ", ".join(selected_have_list),
+            "want_cards": ", ".join(selected_want_list)
         }
         
         try:
@@ -105,7 +138,7 @@ if submitted:
             if res.status_code == 200:
                 st.session_state["registered_user"] = nickname.strip()
                 st.session_state["show_success_msg"] = True
-                time.sleep(1.5)  # 구글 시트에 최신 데이터가 작성될 시간을 대기
+                time.sleep(1.5)
                 st.rerun()
             else:
                 st.error("저장에 실패했습니다. 관리자에게 문의하세요.")
@@ -114,10 +147,9 @@ if submitted:
 
 st.divider()
 
-# 3. 실시간 매칭 현황판
+# 2. 실시간 매칭 현황판
 st.header("🤝 교환 매칭 확인")
 
-# 수동 새로고침 버튼
 if st.button("🔄 실시간 매칭 새로고침"):
     st.rerun()
 
@@ -126,7 +158,6 @@ try:
     raw_data = res.json()
     
     if len(raw_data) > 1:
-        # 데이터프레임 변환
         data_rows = raw_data[1:]
         clean_rows = []
         for r in data_rows:
@@ -137,11 +168,9 @@ try:
         df = df.drop_duplicates(subset=["nickname"], keep="last")
         user_list = df["nickname"].tolist()
         
-        # 👥 참여자 명단 표시 추가
         st.markdown(f"👥 **참여 중인 클랜원 ({len(user_list)}명):** " + " ".join([f"`{u}`" for u in user_list]))
         st.write("")
 
-        # 등록 직후 등록된 닉네임으로 인덱스 자동 지정
         default_idx = 0
         if st.session_state["registered_user"] in user_list:
             default_idx = user_list.index(st.session_state["registered_user"]) + 1
@@ -159,7 +188,7 @@ try:
             my_have = set([c.strip() for c in str(my_info["have_cards"]).split(",") if c.strip()])
             my_want = set([c.strip() for c in str(my_info["want_cards"]).split(",") if c.strip()])
             
-            perfect_matches = []  # 100% 맞교환 성립 조합만 모음
+            perfect_matches = []
 
             for want_card in my_want:
                 for idx, row in df.iterrows():
@@ -170,7 +199,6 @@ try:
                     other_have = set([c.strip() for c in str(row["have_cards"]).split(",") if c.strip()])
                     other_want = set([c.strip() for c in str(row["want_cards"]).split(",") if c.strip()])
                     
-                    # 100% 완벽 맞교환 조건
                     if want_card in other_have:
                         give_to_them = my_have.intersection(other_want)
                         if give_to_them:
@@ -180,7 +208,6 @@ try:
                                 "give": ", ".join(give_to_them)
                             })
 
-            # 100% 맞교환 가능 결과만 출력
             if perfect_matches:
                 for item in perfect_matches:
                     st.success(f"🎯 **{item['want']}** ➔ **[{item['target']}]** 님과 교환 가능! (내가 줄 카드: `{item['give']}`)")
@@ -189,7 +216,6 @@ try:
 
         st.divider()
         
-        # 전체 교환 가능 조합 한눈에 보기
         st.subheader("가능한 교환 조합")
         all_matches = []
         processed_pairs = set()
@@ -214,10 +240,10 @@ try:
                 if p1_gives and p2_gives:
                     processed_pairs.add(pair_key)
                     all_matches.append({
-                        "클랜원": p1,
-                        "줄 카드": ", ".join(p1_gives),
-                        "클랜원": p2,
-                        "받을 카드": ", ".join(p2_gives)
+                        "클랜원 A": p1,
+                        "A가 줄 카드": ", ".join(p1_gives),
+                        "클랜원 B": p2,
+                        "B가 줄 카드": ", ".join(p2_gives)
                     })
 
         if all_matches:
