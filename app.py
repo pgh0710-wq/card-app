@@ -3,18 +3,38 @@ import requests
 import pandas as pd
 import time
 
-# 페이지 설정
-st.set_page_config(page_title="coc 카드교환", page_icon="⚔️", layout="centered")
+# 페이지 설정 (layout을 "wide"로 변경하여 6열 공간 확보)
+st.set_page_config(page_title="coc 카드교환", page_icon="⚔️", layout="wide")
 
-# Streamlit 기본 메뉴 및 워터마크 숨기기
-hide_streamlit_style = """
+# CSS 커스텀: 워터마크 숨기기 + 버튼 글자크기/높이/줄바꿈 자동 맞춤
+custom_css = """
 <style>
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
 header {visibility: hidden;}
+
+/* 버튼 내부 글자 및 크기 자동 조정 */
+div[data-testid="stButton"] > button {
+    font-size: 11px !important;         /* 글자 크기 축소 */
+    padding: 2px 2px !important;        /* 안쪽 여백 축소 */
+    height: 40px !important;            /* 버튼 높이 일괄 통일 */
+    white-space: nowrap !important;     /* 글자 줄바꿈 강제 방지 */
+    word-break: keep-all !important;    /* 단어 파괴 방지 */
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+/* 모바일 등 더 좁은 화면 대응 */
+@media (max-width: 768px) {
+    div[data-testid="stButton"] > button {
+        font-size: 9.5px !important;
+        padding: 1px 1px !important;
+    }
+}
 </style>
 """
-st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+st.markdown(custom_css, unsafe_allow_html=True)
 
 # 구글 Apps Script 웹앱 URL
 GAS_URL = "https://script.google.com/macros/s/AKfycby3wOkkVcxR8aalT0WI8BSONibv0zfkrFN176mthE3PAzZPkyBTA0thuQQ40fW8YyrX/exec"
@@ -68,7 +88,7 @@ st.subheader("📝 내 카드 교환 정보 등록")
 
 nickname = st.text_input("coc 닉네임", placeholder="예: PSG")
 
-# 카드 그리드 버튼 생성 함수 (★ 6열 바둑판 배치로 변경)
+# 카드 그리드 버튼 생성 함수 (6열 바둑판 배치)
 def render_card_buttons(target_set_key, cols_per_row=6):
     for category_name, cards in CARD_DB.items():
         st.markdown(f"##### {category_name}")
