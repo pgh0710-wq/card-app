@@ -3,33 +3,38 @@ import requests
 import pandas as pd
 import time
 
-# 페이지 설정 (layout을 "wide"로 변경하여 6열 공간 확보)
-st.set_page_config(page_title="coc 카드교환", page_icon="⚔️", layout="wide")
+# 페이지 설정 (다시 centered로 복구)
+st.set_page_config(page_title="coc 카드교환", page_icon="⚔️", layout="centered")
 
-# CSS 커스텀: 워터마크 숨기기 + 버튼 글자크기/높이/줄바꿈 자동 맞춤
+# CSS 커스텀: 중앙 정렬 화면 내에서 6열 버튼이 한눈에 쏙 들어가도록 정밀 조절
 custom_css = """
 <style>
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
 header {visibility: hidden;}
 
-/* 버튼 내부 글자 및 크기 자동 조정 */
+/* 버튼 열 간격 세밀하게 줄이기 */
+div[data-testid="column"] {
+    padding: 0px 1px !important;
+}
+
+/* 버튼 크기 및 폰트 세밀 조절 (centered 공간에 최적화) */
 div[data-testid="stButton"] > button {
-    font-size: 11px !important;         /* 글자 크기 축소 */
-    padding: 2px 2px !important;        /* 안쪽 여백 축소 */
-    height: 40px !important;            /* 버튼 높이 일괄 통일 */
-    white-space: nowrap !important;     /* 글자 줄바꿈 강제 방지 */
-    word-break: keep-all !important;    /* 단어 파괴 방지 */
+    font-size: 10px !important;          /* 폰트 크기 미세 축소 */
+    padding: 2px 0px !important;         /* 좌우 여백 최소화 */
+    height: 36px !important;             /* 버튼 높이 균일화 */
+    white-space: nowrap !important;      /* 줄바꿈 강제 방지 */
+    word-break: keep-all !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
 }
 
-/* 모바일 등 더 좁은 화면 대응 */
-@media (max-width: 768px) {
+/* 모바일 화면 대응 */
+@media (max-width: 600px) {
     div[data-testid="stButton"] > button {
-        font-size: 9.5px !important;
-        padding: 1px 1px !important;
+        font-size: 8.5px !important;
+        height: 32px !important;
     }
 }
 </style>
